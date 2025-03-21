@@ -1,11 +1,13 @@
 /* 1986 Delay
  * Stereo Digital Delay Pedal for Guitar
  * High resolution version with half delay time - reads and stores full 12 bit samples in delay array
- * Version 0.1 - untested
+ * Version 1.0
  * 
- *
+ * Requries the following libraries:
+ * DxCore - https://github.com/SpenceKonde/DxCore - install via Boards Manager in Arduino IDE
+ * MCP_DAC - https://github.com/RobTillaart/MCP_DAC - install via Manage Libraries in Arduino IDE
  * 
- * For AVR512DA28 microcontrollers using DxCore library
+ * For AVR512DA28 microcontrollers
  * 
  * Copyright 2025 Samuel Brown. All Rights Reservered.
  * 
