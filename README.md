@@ -4,15 +4,28 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 1986 Delay: A Stereo Digital Delay pedal for guitar built around the AVR128DA28 MCU.
+
 50 to 1000 millisecond delay with stereo outputs and two modes
+
+
 Mode 1: Ping-Pong delay. Output B has half the delay time of output A
+
 Mode 2: "Reverse Ping-Pong" delay. Output A has half the selected delay time and runs like a stardard delay, while output B runs in reverse and is synchronized with output A for a stereo effect.
+
+
 Digital Controls:
+
   A: Effective delay line length
+  
   B: Sample rate
+
+  
 Analog Controls:
+
   Mix: The amount of delayed signal mixed with the dry signal at output
+  
   Feedback: The amount of delayed signal mixed with the input signal to the delay line
+
 
  * Copyright 2025 Samuel Brown. All Rights Reservered.
  * 
