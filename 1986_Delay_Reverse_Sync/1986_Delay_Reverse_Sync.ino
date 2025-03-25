@@ -8,7 +8,7 @@
  * 
  * Removed requirement for MCP_DAC library - now calls SPI functions directly
  * 
- * For AVR512DA28 microcontrollers
+ * For AVR128DA28 microcontrollers
  * 
  * Copyright 2025 Samuel Brown. All Rights Reservered.
  * 
