@@ -5,7 +5,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 1986 Delay: A Stereo Digital Delay pedal for guitar built around the AVR128DA28 MCU.
 
-50 to 1000 millisecond delay with stereo outputs and two modes
+Up to 1000 millisecond delay with stereo outputs and two modes
 
 
 Mode 1: Ping-Pong delay. Output B has half the delay time of output A
@@ -42,6 +42,5 @@ Analog Controls:
 To use this software you will need:
 * Arduino IDE version 1.8.19 or greater
 * DxCore library for AVR128DA28 support (https://github.com/SpenceKonde/DxCore)
-* MCP_DAC library (https://github.com/RobTillaart/MCP_DAC)
 * Any USB to UPDI programmer. I recommend the Adafruit UPDI Friend because it is easy to use and under $20
 * An AVR128DA28 MCU and appropriate supporting circuitry. Refer to the KiCad schematic and board files included in this repository.
