@@ -1,14 +1,12 @@
 /* 1986 Delay
  * Stereo Digital Delay Pedal for Guitar
  * High resolution version with half delay time - reads and stores full 12 bit samples in delay array
- * Version 1.1
+ * Version 1.2
  * 
  * Requries the following libraries:
  * DxCore - https://github.com/SpenceKonde/DxCore - install via Boards Manager in Arduino IDE
- * MCP_DAC - https://github.com/RobTillaart/MCP_DAC - install via Manage Libraries in Arduino IDE !!!
- *  !!!IMPORTANT!!!: For proper speed adjustment range, it is necessary to modify MCP_DAC.cpp to use the DxCore digitalWriteFast() function.
- *  This replaces the standard digitalWrite() within the transfer() function and must use the PIN_PA7 constant instead of the _select variable.
- *  Without this change, the maximum sample rate is limited to approximately 15ksps instead of 20ksps
+ * 
+ * Removed requirement for MCP_DAC library - now calls SPI functions directly
  * 
  * For AVR512DA28 microcontrollers
  * 
@@ -25,9 +23,8 @@
  * For commercial licensing contact sam.brown.rit08@gmail.com
  */
 
-#include "MCP_DAC.h"
+#include "SPI.h"
 
-MCP4922 MCP;
 
 //IO Pins
 const uint8_t InputPin = PIN_PD0;
@@ -37,7 +34,6 @@ const uint8_t SyncPin = PIN_PA0;
 const uint8_t DAC_CS = PIN_PA7;
 //Audio Samples
 uint16_t sampleIn;
-uint16_t sampleDelay;
 uint16_t sampleOutA;
 uint16_t sampleOutB;
 uint16_t delayArray[8000];
@@ -51,6 +47,9 @@ uint16_t delayTimeB = 0;
 uint16_t extraClocks = 0;
 bool resetSample = false;
 
+uint32_t _SPIspeed = 20000000;
+SPISettings _spi_settings;
+
 ISR(TCA0_OVF_vect) {                                        //runs each time the TCA0 periodic interrupt triggers
   TCA0.SINGLE.INTFLAGS = TCA_SINGLE_OVF_bm;                 //clear the interrupt flags
 
@@ -59,7 +58,8 @@ ISR(TCA0_OVF_vect) {                                        //runs each time the
   //ADC0.MUXPOS = ((TimePinA & 0x7F) << ADC_MUXPOS_gp);
   
   //analogSampleDuration(4);
-  delayTimeA = analogRead(TimePinA) << 1;                   //read the delay time A knob as a value from 0-8191
+  delayTimeA = analogRead(TimePinA) >> 2;                   //read the delay time A knob as a value from 0-8191
+  delayTimeA *= 8;
   delayTimeA++;                                             //we can't let this be zero
   if (delayTimeA > 8000){delayTimeA = 8000;}
   //ADC0.MUXPOS = ((TimePinB & 0x7F) << ADC_MUXPOS_gp);
@@ -87,14 +87,24 @@ ISR(TCA0_OVF_vect) {                                        //runs each time the
   }
   
   //output the delayed samples via external DAC
-  /* IMPORTANT!!!
-   *  BEFORE COMPILING, MAKE SURE THAT MCP_DAC.cpp 
-   *  has the digitalWriteFast() calls in the transfer()
-   *  function. This must include the constant value for
-   *  the DAC chip select pin.
-   */
-  MCP.fastWriteA(delayArray[delayStepA]);
-  MCP.fastWriteB(delayArray[delayStepB]);
+  //prepare and output A:
+  sampleOutA = delayArray[delayStepA];
+  sampleOutA |= 0x3000;
+  digitalWriteFast(DAC_CS, LOW);
+  SPI.beginTransaction(_spi_settings);
+  SPI.transfer((uint8_t)(sampleOutA >> 8));
+  SPI.transfer((uint8_t)(sampleOutA & 0xFF));
+  SPI.endTransaction();
+  digitalWriteFast(DAC_CS, HIGH);
+  //prepare and output B:
+  sampleOutB = delayArray[delayStepB];
+  sampleOutB |= 0xB000;
+  digitalWriteFast(DAC_CS, LOW);
+  SPI.beginTransaction(_spi_settings);
+  SPI.transfer((uint8_t)(sampleOutB >> 8));
+  SPI.transfer((uint8_t)(sampleOutB & 0xFF));
+  SPI.endTransaction();
+  digitalWriteFast(DAC_CS, HIGH);
   
   //re-read the input and average it with earlier reading and store it
   //analogSampleDuration(0);
@@ -120,12 +130,13 @@ void setup() {
   }
   //setup I/O
   SPI.begin();
-  MCP.begin(DAC_CS);
   pinMode(InputPin, INPUT);
   pinMode(TimePinA, INPUT);
   pinMode(TimePinB, INPUT);
   pinMode(SyncPin, INPUT);
   pinMode(DAC_CS, OUTPUT);
+  digitalWriteFast(DAC_CS, HIGH);
+  _spi_settings = SPISettings(_SPIspeed, MSBFIRST, SPI_MODE0);
   //setup ADC
   analogReference(EXTERNAL);
   analogReadResolution(12);
