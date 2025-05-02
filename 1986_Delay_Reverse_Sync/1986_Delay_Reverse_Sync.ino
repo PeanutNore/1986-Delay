@@ -8,7 +8,7 @@
  * 
  * Removed requirement for MCP_DAC library - now calls SPI functions directly
  * 
- * For AVR128DA28 microcontrollers
+ * For AVR512DA28 microcontrollers
  * 
  * Copyright 2025 Samuel Brown. All Rights Reservered.
  * 
@@ -33,19 +33,21 @@ const uint8_t TimePinB = PIN_PD2;
 const uint8_t SyncPin = PIN_PA0;
 const uint8_t DAC_CS = PIN_PA7;
 //Audio Samples
-uint16_t sampleIn;
-uint16_t sampleOutA;
-uint16_t sampleOutB;
-uint16_t delayArray[8000];
+volatile uint16_t sampleIn;
+volatile uint16_t sampleOutA;
+volatile uint16_t sampleOutB;
+volatile uint16_t delayArray[8000];
 //Step Counters
-uint16_t sampleStep = 0;
-int16_t delayStepA = 0;
-int16_t delayStepB = 0;
+volatile uint16_t sampleStep = 0;
+volatile int16_t delayStepA = 0;
+volatile int16_t delayStepB = 0;
 //Controls
-uint16_t delayTimeA = 0;
-uint16_t delayTimeB = 0;
-uint16_t extraClocks = 0;
-bool resetSample = false;
+volatile uint16_t delayTimeA = 0;
+volatile uint16_t targetTimeA = 0;
+volatile uint16_t delayTimeB = 0;
+volatile uint16_t targetTimeB = 0;
+volatile uint16_t extraClocks = 0;
+volatile bool resetSample = false;
 
 uint32_t _SPIspeed = 20000000;
 SPISettings _spi_settings;
@@ -58,15 +60,14 @@ ISR(TCA0_OVF_vect) {                                        //runs each time the
   //ADC0.MUXPOS = ((TimePinA & 0x7F) << ADC_MUXPOS_gp);
   
   //analogSampleDuration(4);
-  delayTimeA = analogRead(TimePinA) >> 2;                   //read the delay time A knob as a value from 0-8191
-  delayTimeA *= 8;
-  delayTimeA++;                                             //we can't let this be zero
-  if (delayTimeA > 8000){delayTimeA = 8000;}
-  //ADC0.MUXPOS = ((TimePinB & 0x7F) << ADC_MUXPOS_gp);
-  delayTimeB = delayTimeA >> 1;                           //set delay time B to half of delay time 
+  targetTimeA = analogRead(TimePinA) >> 3;                   //read the delay time A knob as a value from 0-511 to reduce noise
+  targetTimeA *= 15;                                         //scale it to 0-7665
+  targetTimeA += 335;                                        //shift it so it maxes out at 8000
+  if (delayTimeA < targetTimeA){delayTimeA++;}
+  if (delayTimeA > targetTimeA){delayTimeA--;}
+  delayTimeB = delayTimeA >> 1;                             //set delay time B to half of delay time 
 
   extraClocks = analogRead(TimePinB) >> 1;
-  //ADC0.MUXPOS = ((InputPin & 0x7F) << ADC_MUXPOS_gp);       //done reading delay time, set the mux back to the audio input
   TCA0.SINGLE.PERBUF = 1200 + extraClocks;
 
   //reverse ping pong mode
@@ -85,24 +86,26 @@ ISR(TCA0_OVF_vect) {                                        //runs each time the
     delayStepB = sampleStep - delayTimeB;
     if (delayStepB < 0){delayStepB += 8000;}
   }
+
+  ADC0.MUXPOS = ((InputPin & 0x7F) << ADC_MUXPOS_gp);
   
   //output the delayed samples via external DAC
   //prepare and output A:
-  sampleOutA = delayArray[delayStepA];
-  sampleOutA |= 0x3000;
+  sampleOutA = delayArray[delayStepA];        //get the sample at step A
+  sampleOutA |= 0x3000;                       //add the command bits for the DAC (channel 0)
   digitalWriteFast(DAC_CS, LOW);
   SPI.beginTransaction(_spi_settings);
-  SPI.transfer((uint8_t)(sampleOutA >> 8));
-  SPI.transfer((uint8_t)(sampleOutA & 0xFF));
+  SPI.transfer((uint8_t)(sampleOutA >> 8));   //send the high byte first
+  SPI.transfer((uint8_t)(sampleOutA & 0xFF)); //send the low byte second
   SPI.endTransaction();
   digitalWriteFast(DAC_CS, HIGH);
   //prepare and output B:
-  sampleOutB = delayArray[delayStepB];
-  sampleOutB |= 0xB000;
+  sampleOutB = delayArray[delayStepB];        //get the sample at step B
+  sampleOutB |= 0xB000;                       //add the command bits for the DAC (channel 1)
   digitalWriteFast(DAC_CS, LOW);
   SPI.beginTransaction(_spi_settings);
-  SPI.transfer((uint8_t)(sampleOutB >> 8));
-  SPI.transfer((uint8_t)(sampleOutB & 0xFF));
+  SPI.transfer((uint8_t)(sampleOutB >> 8));   //send the high byte first
+  SPI.transfer((uint8_t)(sampleOutB & 0xFF)); //send the low byte second
   SPI.endTransaction();
   digitalWriteFast(DAC_CS, HIGH);
   
@@ -119,8 +122,6 @@ ISR(TCA0_OVF_vect) {                                        //runs each time the
     delayStepB = delayTimeA;           //the record and reverse playback heads need to be rolled over together for this to work right
     resetSample = false;
   }
-  
-  ADC0.MUXPOS = ((InputPin & 0x7F) << ADC_MUXPOS_gp);
 }
 
 void setup() {
